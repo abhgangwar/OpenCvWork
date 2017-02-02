@@ -1,0 +1,5 @@
+cmake_minimum_required(VERSION 2.8)
+project( RebuildImage )
+find_package( OpenCV REQUIRED )
+add_executable( RebuildImage RebuildImage.cpp )
+target_link_libraries( RebuildImage ${OpenCV_LIBS} )
