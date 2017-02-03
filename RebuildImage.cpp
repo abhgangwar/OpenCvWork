@@ -1,6 +1,7 @@
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
 #include <iostream>
+#include <map>
 
 using namespace cv;
 using namespace std;
@@ -11,6 +12,7 @@ int max_thresh = 255;
 RNG rng(12345);
 
 void customRebuild(Mat&, vector<vector<Point> >&, vector<Vec4i>&);
+void _customRebuild(Mat&, vector<vector<Point> >&, vector<Vec4i>&, int, Scalar);
 
 /** @function main */
 int main( int argc, char** argv )
@@ -36,12 +38,10 @@ int main( int argc, char** argv )
   //Finding contours
   vector<vector<Point> > contours;
   vector<Vec4i> hierarchy;
-  findContours(cannyEdges, contours, hierarchy, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE, Point(0,0));
+  findContours(inputGray, contours, hierarchy, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE, Point(0,0));
+  cout << "_hierarchy size " <<  hierarchy.size() << " contours size " << contours.size() << endl;
   Mat rebuild = Mat::zeros(cannyEdges.size(), CV_8UC3);
-  // rebuild[:] = (255, 255, 255)
   rebuild = Scalar(255, 255, 255);
-  namedWindow("Rebuild", CV_WINDOW_NORMAL);
-  imshow("Rebuild", rebuild);
 
   customRebuild(rebuild, contours, hierarchy);
 
@@ -51,13 +51,19 @@ int main( int argc, char** argv )
 
 void customRebuild(Mat& img, vector<vector<Point> >& _contours, vector<Vec4i>& _hierarchy)
 {
-  // vector<CvSeq> contours;
   if(!_contours.size() || !_hierarchy.size()) return;
   int count = _hierarchy.size();
   Scalar color = Scalar( 0, 0, 0 );
-
-  for(int i=0; i<count; ++i) {
+  Scalar fillColor1 = Scalar( 255, 255, 255 );
+  Scalar fillColor2 = Scalar( 0, 0, 0 );
+  int i;
+  for(i=0; i<count; ++i) {
     vector<Point> v = _contours[i];
+    int size = _contours[i].size();
+    
+    vector<Point> *currentCon = &_contours[i];
+    const Point **u = (const Point**)(&currentCon[0]);
+    fillPoly(img, u, &size, 1, (i%2==0)?fillColor1:fillColor2, 8);
     int cSize = v.size();
     if(cSize) {
       Point prev = v[0];
@@ -67,6 +73,7 @@ void customRebuild(Mat& img, vector<vector<Point> >& _contours, vector<Vec4i>& _
       }
     }
   }
+  // cout << "Iterated: " << i << endl;
 
   namedWindow( "MyWindow", CV_WINDOW_NORMAL );
   imshow( "MyWindow", img );
