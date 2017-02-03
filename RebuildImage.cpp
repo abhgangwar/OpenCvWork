@@ -1,20 +1,18 @@
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
 #include <iostream>
-#include <map>
 
 using namespace cv;
 using namespace std;
 
-Mat src; Mat src_gray;
-int thresh = 100;
-int max_thresh = 255;
 RNG rng(12345);
+Scalar fillColor1 = Scalar( 255, 255, 255 );
+Scalar fillColor2 = Scalar( 0, 0, 0 );
 
-void customRebuild(Mat&, vector<vector<Point> >&, vector<Vec4i>&);
-void _customRebuild(Mat&, vector<vector<Point> >&, vector<Vec4i>&, int, Scalar);
+void customRebuild(Mat&, vector<vector<Point> >&, vector<Vec4i>&, bool);
+void fillContour(Mat&, const Point**, int *, int, Scalar);
+Scalar getFillColor(bool blacknWhite, int idx, int total = 0);
 
-/** @function main */
 int main( int argc, char** argv )
 {
   Mat input, inputGray;
@@ -42,28 +40,41 @@ int main( int argc, char** argv )
   cout << "_hierarchy size " <<  hierarchy.size() << " contours size " << contours.size() << endl;
   Mat rebuild = Mat::zeros(cannyEdges.size(), CV_8UC3);
   rebuild = Scalar(255, 255, 255);
+  customRebuild(rebuild, contours, hierarchy, false);
 
-  customRebuild(rebuild, contours, hierarchy);
+  namedWindow( "Rebuilt from contours", CV_WINDOW_NORMAL );
+  imshow( "Rebuilt from contours", rebuild );
+
+  Mat rebuildWithColors = Mat::zeros(cannyEdges.size(), CV_8UC3);
+  rebuildWithColors = Scalar(255, 255, 255);
+  customRebuild(rebuildWithColors, contours, hierarchy, true);
+
+  namedWindow( "Contours filled with different colors", CV_WINDOW_NORMAL );
+  imshow( "Contours filled with different colors", rebuildWithColors );
 
   waitKey(0);
   return(0);
 }
 
-void customRebuild(Mat& img, vector<vector<Point> >& _contours, vector<Vec4i>& _hierarchy)
+void customRebuild(Mat& img, vector<vector<Point> >& _contours, vector<Vec4i>& _hierarchy, bool multipleColors)
 {
   if(!_contours.size() || !_hierarchy.size()) return;
   int count = _hierarchy.size();
   Scalar color = Scalar( 0, 0, 0 );
-  Scalar fillColor1 = Scalar( 255, 255, 255 );
-  Scalar fillColor2 = Scalar( 0, 0, 0 );
+
   int i;
   for(i=0; i<count; ++i) {
     vector<Point> v = _contours[i];
     int size = _contours[i].size();
-    
     vector<Point> *currentCon = &_contours[i];
     const Point **u = (const Point**)(&currentCon[0]);
-    fillPoly(img, u, &size, 1, (i%2==0)?fillColor1:fillColor2, 8);
+    Scalar fillColor;
+    if(multipleColors) {
+      fillColor = getFillColor(false, i, count);
+    } else {
+      fillColor = getFillColor(true, i, 0);
+    }
+    fillPoly(img, u, &size, 1, fillColor, 8);
     int cSize = v.size();
     if(cSize) {
       Point prev = v[0];
@@ -73,9 +84,35 @@ void customRebuild(Mat& img, vector<vector<Point> >& _contours, vector<Vec4i>& _
       }
     }
   }
-  // cout << "Iterated: " << i << endl;
 
-  namedWindow( "MyWindow", CV_WINDOW_NORMAL );
-  imshow( "MyWindow", img );
+  // The colors used were HSV. Convert the color space.
+  if(multipleColors) {
+    cvtColor(img, img, COLOR_HSV2BGR_FULL);
+  }
   return;
+}
+
+Scalar getFillColor(bool blacknWhite, int idx, int total)
+{
+  if(blacknWhite) {
+    return (idx %2 == 0) ? fillColor1 : fillColor2;
+  }
+  else if(total == 0) {
+    return fillColor1;
+  }
+  else {
+    /**
+     * To generate visually random color.
+     * Refer to HSV color space https://en.wikipedia.org/wiki/HSL_and_HSV
+     */
+    // Hue is between [0, 180)
+    float factor = float(180)/float(total);
+    int hue = factor*(idx+1);
+    // Saturation is between [0, 100)
+    int saturation = 240 + rng.uniform(0, 15);
+    // value is between [0, 100)
+    int value = 240 + rng.uniform(0, 15);
+    Scalar fillColor(hue, saturation, value);   
+    return fillColor;
+  }
 }
